@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use crate::util::ListVec;
 
 /// Sentence that can be annotated.
-#[pyclass(name=Sentence)]
+#[pyclass(name = Sentence)]
 pub struct PySentence {
     inner: Rc<RefCell<Sentence>>,
 }
@@ -30,9 +30,10 @@ impl PySentence {
         obj: &PyRawObject,
         forms: ListVec<&str>,
         pos_tags: Option<ListVec<&str>>,
+        lemmas: Option<ListVec<&str>>,
     ) -> PyResult<()> {
-        let sent = match pos_tags {
-            Some(pos_tags) => {
+        let sent = match (pos_tags, lemmas) {
+            (Some(pos_tags), Some(lemmas)) => {
                 if forms.len() != pos_tags.len() {
                     return Err(exceptions::ValueError::py_err(format!(
                         "token and part-of-speech lists have inequal lengths: {} {}",
@@ -40,7 +41,46 @@ impl PySentence {
                         pos_tags.len()
                     )));
                 }
-
+                if forms.len() != lemmas.len() {
+                    return Err(exceptions::ValueError::py_err(format!(
+                        "token and lemma lists have inequal lengths: {} {}",
+                        forms.len(),
+                        lemmas.len()
+                    )));
+                }
+                forms
+                    .into_inner()
+                    .into_iter()
+                    .zip(pos_tags.into_inner())
+                    .zip(lemmas.into_inner())
+                    .map(|((form, pos_tag), lemma)| {
+                        TokenBuilder::new(form).pos(pos_tag).lemma(lemma).into()
+                    })
+                    .collect::<Sentence>()
+            }
+            (None, Some(lemmas)) => {
+                if forms.len() != lemmas.len() {
+                    return Err(exceptions::ValueError::py_err(format!(
+                        "token and lemma lists have inequal lengths: {} {}",
+                        forms.len(),
+                        lemmas.len()
+                    )));
+                }
+                forms
+                    .into_inner()
+                    .into_iter()
+                    .zip(lemmas.into_inner())
+                    .map(|(form, lemma)| TokenBuilder::new(form).lemma(lemma).into())
+                    .collect::<Sentence>()
+            }
+            (Some(pos_tags), None) => {
+                if forms.len() != pos_tags.len() {
+                    return Err(exceptions::ValueError::py_err(format!(
+                        "token and part-of-speech lists have inequal lengths: {} {}",
+                        forms.len(),
+                        pos_tags.len()
+                    )));
+                }
                 forms
                     .into_inner()
                     .into_iter()
@@ -48,7 +88,7 @@ impl PySentence {
                     .map(|(form, pos_tag)| TokenBuilder::new(form).pos(pos_tag).into())
                     .collect::<Sentence>()
             }
-            None => forms
+            (None, None) => forms
                 .into_inner()
                 .into_iter()
                 .map(Token::new)
@@ -121,7 +161,7 @@ impl PySequenceProtocol for PySentence {
 /// Iterator over the nodes in a dependency graph.
 ///
 /// The nodes are returned in sentence-linear order.
-#[pyclass(name=SentenceIterator)]
+#[pyclass(name = SentenceIterator)]
 pub struct PySentenceIterator {
     sent: Rc<RefCell<Sentence>>,
     idx: usize,
@@ -152,7 +192,7 @@ impl PyIterProtocol for PySentenceIterator {
 }
 
 /// Token that can be annotated.
-#[pyclass(name=Token)]
+#[pyclass(name = Token)]
 pub struct PyToken {
     sent: Rc<RefCell<Sentence>>,
     token_idx: usize,
@@ -174,6 +214,15 @@ impl PyToken {
     fn get_form(&self) -> Option<String> {
         match self.sent.borrow()[self.token_idx] {
             Node::Token(ref token) => Some(token.form().to_owned()),
+            Node::Root => None,
+        }
+    }
+
+    /// Get the form of the token.
+    #[getter]
+    fn get_lemma(&self) -> Option<String> {
+        match self.sent.borrow()[self.token_idx] {
+            Node::Token(ref token) => token.lemma().map(ToOwned::to_owned),
             Node::Root => None,
         }
     }
@@ -236,7 +285,7 @@ impl PyObjectProtocol for PyToken {
 }
 
 /// Token that can be annotated.
-#[pyclass(name=Features)]
+#[pyclass(name = Features)]
 pub struct PyFeatures {
     sent: Rc<RefCell<Sentence>>,
     token_idx: usize,

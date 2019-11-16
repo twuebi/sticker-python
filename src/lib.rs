@@ -7,7 +7,7 @@ mod sentence;
 pub use sentence::{PySentence, PySentenceIterator, PyToken};
 
 mod decoder;
-use decoder::{PyDecoder,PyLabel};
+use decoder::{PyDecoder, PyLabel};
 
 /// This is a Python module for wrapping the sticker sequence labeler.
 #[pymodule]
