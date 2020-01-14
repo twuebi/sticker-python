@@ -1,11 +1,11 @@
 use pyo3::exceptions;
 use pyo3::prelude::*;
 
+use sticker_encoders::deprel::{DependencyEncoding, RelativePOS, RelativePOSEncoder};
+use sticker_encoders::{EncodingProb, SentenceDecoder};
 use crate::{ListVec, PySentence};
 use pyo3::types::PyAny;
 use std::ops::Deref;
-use sticker::encoder::deprel::{DependencyEncoding, RelativePOS, RelativePOSEncoder};
-use sticker::encoder::{EncodingProb, SentenceDecoder};
 
 /// Decodes RelativePOS labels
 #[pyclass(name = Decoder)]
@@ -41,13 +41,9 @@ impl PyDecoder {
             .zip(labels.deref())
             .map(|(sent, sent_labels)| {
                 let s = &mut **sent;
-                let sent_labels: Vec<Vec<_>> = sent_labels
-                    .iter()
-                    .map(|tok| {
-                        tok.iter()
-                            .map(|single| single.into())
-                            .collect::<Vec<EncodingProb<'_, DependencyEncoding<RelativePOS>>>>()
-                    })
+                let sent_labels: Vec<Vec<_>> = sent_labels.iter()
+                    .map(|tok| tok.iter().map(|single|
+                        single.into()).collect::<Vec<EncodingProb<DependencyEncoding<RelativePOS>>>>())
                     .collect::<Vec<Vec<_>>>();
                 self.inner.decode(&sent_labels, s)
             })
@@ -77,10 +73,10 @@ impl PyLabel {
         probability: f32,
     ) -> PyResult<()> {
         obj.init(PyLabel {
-            distance: distance,
+            distance,
             pos: pos.to_string(),
             relation: relation.to_string(),
-            probability: probability,
+            probability,
         });
         Ok(())
     }
@@ -95,12 +91,10 @@ impl<'a> FromPyObject<'a> for PyLabel {
     }
 }
 
-impl<'a> Into<EncodingProb<'a, DependencyEncoding<RelativePOS>>> for &PyLabel {
-    fn into(self) -> EncodingProb<'a, DependencyEncoding<RelativePOS>> {
+
+impl<'a> Into<EncodingProb<DependencyEncoding<RelativePOS>>> for &PyLabel {
+    fn into(self) -> EncodingProb<DependencyEncoding<RelativePOS>> {
         let rel_pos = RelativePOS::new(self.pos.to_string(), self.distance);
-        EncodingProb::new_from_owned(
-            DependencyEncoding::new(rel_pos, self.relation.to_string()),
-            self.probability,
-        )
+        EncodingProb::new(DependencyEncoding::new(rel_pos, self.relation.to_string()), self.probability)
     }
 }

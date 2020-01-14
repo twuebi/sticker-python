@@ -16,5 +16,4 @@ features = ["extension-module"]
 
 [dependencies]
 conllx = "0.12.1"
-sticker = {git = "https://github.com/twuebi/sticker/", branch="expose_encoding"}
-sticker-utils = {git = "https://github.com/twuebi/sticker/", branch="expose_encoding"}
+sticker-encoders = {git = "https://github.com/stickeritis/sticker-encoders", rev="8dd3bfa"}
