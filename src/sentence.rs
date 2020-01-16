@@ -10,6 +10,7 @@ use pyo3::class::sequence::PySequenceProtocol;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 
+use crate::lemma::PyEditTree;
 use crate::util::ListVec;
 
 /// Sentence that can be annotated.
@@ -104,6 +105,11 @@ impl PySentence {
 }
 
 impl PySentence {
+    pub fn new(sent: Sentence) -> Self {
+        PySentence {
+            inner: Rc::new(sent.into()),
+        }
+    }
     pub fn inner(&self) -> RefMut<Sentence> {
         self.inner.borrow_mut()
     }
@@ -255,6 +261,43 @@ impl PyToken {
             Node::Root => None,
         }
     }
+
+    #[setter]
+    fn set_pos(&mut self, pos: &str) -> PyResult<()> {
+        match self.sent.borrow_mut()[self.token_idx].token_mut() {
+            Some(token) => {
+                token.set_pos(Some(pos));
+                Ok(())
+            }
+            None => Err(exceptions::Exception::py_err("cannot set pos of root")),
+        }
+    }
+
+    #[setter]
+    fn set_lemma(&mut self, lemma: &str) -> PyResult<()> {
+        match self.sent.borrow_mut()[self.token_idx].token_mut() {
+            Some(token) => {
+                token.set_lemma(Some(lemma));
+                Ok(())
+            }
+            None=> Err(exceptions::Exception::py_err("cannot set pos of root")),
+        }
+    }
+
+    fn compute_edit_tree(&self) -> PyResult<PyEditTree> {
+        match self.sent.borrow()[self.token_idx] {
+            Node::Token(ref token) => {
+                let lemma = match token.lemma() {
+                    Some(lemma) => lemma,
+                    None => token.form(),
+                };
+                Ok(PyEditTree::new(token.form().chars(), lemma.chars()))
+            }
+            Node::Root => Err(exceptions::Exception::py_err(
+                "cannot compute edit tree for root",
+            )),
+        }
+    }
 }
 
 #[pyproto]
@@ -265,7 +308,9 @@ impl PyObjectProtocol for PyToken {
             Node::Token(ref token) => {
                 let mut attrs = Vec::new();
                 attrs.push(format!("form = '{}'", token.form()));
-
+                if let Some(lemma) = token.lemma() {
+                    attrs.push(format!("lemma = '{}'", lemma));
+                }
                 if let Some(pos) = token.pos() {
                     attrs.push(format!("pos = '{}'", pos));
                 };
@@ -293,6 +338,22 @@ pub struct PyFeatures {
 
 #[pymethods]
 impl PyFeatures {
+    fn get(&self, name: &str, default: Option<&str>) -> PyResult<Option<String>> {
+        let token = self.token()?;
+
+        match token
+            .features()
+            .and_then(|features| features.get(name))
+            // On the Rust side, we can have features without values.
+            // Not sure if/how we want to handle this in Python.
+            .and_then(|feature| feature.as_ref())
+            .map(ToOwned::to_owned)
+        {
+            Some(val) => Ok(Some(val)),
+            None => Ok(default.map(ToOwned::to_owned)),
+        }
+    }
+
     fn contains(&self, name: &str) -> PyResult<bool> {
         let token = self.token()?;
 
