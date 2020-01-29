@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
-use conllx::graph::{Node, Sentence};
+use conllx::graph::{Node, Sentence, DepTriple};
 use conllx::token::{Features, Token, TokenBuilder};
 use pyo3::class::basic::PyObjectProtocol;
 use pyo3::class::iter::PyIterProtocol;
@@ -254,6 +254,9 @@ impl PyToken {
             Node::Token(ref token) => token.pos().map(ToOwned::to_owned),
             Node::Root => None,
         }
+    }
+    fn set_rel(&self, head:usize, rel: Option<&str>) {
+        self.sent.borrow_mut().dep_graph_mut().add_deprel(DepTriple::new(head, rel, self.token_idx));
     }
 }
 
