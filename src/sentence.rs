@@ -10,10 +10,11 @@ use pyo3::class::sequence::PySequenceProtocol;
 use pyo3::exceptions;
 use pyo3::prelude::*;
 
-use crate::util::ListVec;
+//use crate::util::ListVec;
 
 /// Sentence that can be annotated.
 #[pyclass(name = Sentence)]
+#[derive(Clone)]
 pub struct PySentence {
     inner: Rc<RefCell<Sentence>>,
 }
@@ -26,12 +27,11 @@ impl PySentence {
     /// provided, but the number or tags is not equal to the number of
     /// tokens.
     #[new]
-    fn __new__(
-        obj: &PyRawObject,
-        forms: ListVec<&str>,
-        pos_tags: Option<ListVec<&str>>,
-        lemmas: Option<ListVec<&str>>,
-    ) -> PyResult<()> {
+    fn new(
+        forms: Vec<&str>,
+        pos_tags: Option<Vec<&str>>,
+        lemmas: Option<Vec<&str>>,
+    ) -> Result<Self, PyErr> {
         let sent = match (pos_tags, lemmas) {
             (Some(pos_tags), Some(lemmas)) => {
                 if forms.len() != pos_tags.len() {
@@ -49,10 +49,9 @@ impl PySentence {
                     )));
                 }
                 forms
-                    .into_inner()
                     .into_iter()
-                    .zip(pos_tags.into_inner())
-                    .zip(lemmas.into_inner())
+                    .zip(pos_tags)
+                    .zip(lemmas)
                     .map(|((form, pos_tag), lemma)| {
                         TokenBuilder::new(form).pos(pos_tag).lemma(lemma).into()
                     })
@@ -67,9 +66,8 @@ impl PySentence {
                     )));
                 }
                 forms
-                    .into_inner()
                     .into_iter()
-                    .zip(lemmas.into_inner())
+                    .zip(lemmas)
                     .map(|(form, lemma)| TokenBuilder::new(form).lemma(lemma).into())
                     .collect::<Sentence>()
             }
@@ -82,32 +80,50 @@ impl PySentence {
                     )));
                 }
                 forms
-                    .into_inner()
                     .into_iter()
-                    .zip(pos_tags.into_inner())
+                    .zip(pos_tags)
                     .map(|(form, pos_tag)| TokenBuilder::new(form).pos(pos_tag).into())
                     .collect::<Sentence>()
             }
             (None, None) => forms
-                .into_inner()
                 .into_iter()
                 .map(Token::new)
                 .collect::<Sentence>(),
         };
 
-        obj.init(PySentence {
+        Ok(PySentence {
             inner: Rc::new(sent.into()),
-        });
+        })
 
-        Ok(())
     }
 }
+
+//impl<'source>  FromPyObject<'source>  for PySentence {
+//    fn extract(ob: &'source PyAny) -> Result<Self, PyErr> {
+//        let ob : PySentence = ob.extract()?;
+//        Ok(ob)
+//    }
+//}
+
+//impl<'source>  FromPyObject<'source>  for &'source PySentence {
+//    fn extract(ob: &'source PyAny) -> Result<Self, PyErr> {
+//        let ob : &PySentence = ob.extract()?;
+//        Ok(ob)
+//    }
+//}
 
 impl PySentence {
     pub fn inner(&self) -> RefMut<Sentence> {
         self.inner.borrow_mut()
     }
 }
+//
+//impl FromPyObject<'_> for PySentence {
+//    fn extract(ob: &PyAny) -> Result<Self, PyErr> {
+//        let obj : PySentence = ob.extract();
+//        Ok(obj)
+//    }
+//}
 
 #[pyproto]
 impl PyIterProtocol for PySentence {
@@ -413,3 +429,5 @@ impl PyObjectProtocol for PyFeatures {
         self.__repr__()
     }
 }
+
+

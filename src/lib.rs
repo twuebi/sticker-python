@@ -1,8 +1,5 @@
 use pyo3::prelude::*;
 
-mod util;
-pub use util::ListVec;
-
 mod sentence;
 pub use sentence::{PySentence, PySentenceIterator, PyToken};
 
