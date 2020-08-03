@@ -1,9 +1,9 @@
 [package]
-name = "sticker-python"
+name = "sticker-decoders-python"
 version = "0.1.0"
-authors = ["Daniël de Kok <me@danieldk.eu>"]
+authors = ["Tobias Pütz <puetztobias@gmail.com>", "Daniël de Kok <me@danieldk.eu>"]
 edition = "2018"
-description = "Sticker Python module"
+description = "Sticker Python module minus the models"
 license = "BlueOak-1.0.0"
 
 [lib]
